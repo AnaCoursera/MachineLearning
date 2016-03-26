@@ -1,0 +1,102 @@
+---
+title: "Machine Learning Project"
+author: "Ana Minguez"
+output: html_document
+---
+
+## 1. Introduction
+
+Using devices such as *Jawbone Up, Nike FuelBand*, and *Fitbit* it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type  of divices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify *how much* of a particular activity they do, but they rarely quantify *how well* they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here:
+
+<http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset).
+
+### Data:
+The training data for this project are available here:
+
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
+
+The test data are available here:
+
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+The data for this project come from this source: <http://groupware.les.inf.puc-rio.br/har>.
+
+### Objective:
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+## 2. Analysis
+### Loading Packages and setting up reproductivity:
+```{r}
+# Packages needed
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+
+# Set seed for reproducibility
+set.seed(12000)
+```
+
+### Loading and Cleaning Data:
+We load the training data and we clean them. It is important to recode all blank values and "#DIV/0!" into NA.
+```{r,cache=TRUE}
+data<-read.csv("pml-training.csv",na.strings = c("NA","#DIV/0!",""))
+```
+The DataSet contains a big number of field with a big number of NA, we remove all the variables with more that 50% of NA
+
+```{r,cache=TRUE}
+toclean<-sapply(colnames(data), function(x) if(sum(is.na(data[,x]))>0.5*nrow(data)){return(TRUE)}else{return(FALSE)})
+data<-data[,!toclean]
+## We can also exclude ids, personal identifications, etc
+data<-data[,-(1:6)]
+```
+
+Now, we have a data set with **`r ncol(data)`** variables.
+
+```{r,cache=TRUE}
+names(data)
+```
+
+### Spliting the data:
+Now we should split our dataset in 2 partitions: 70% training set and 30% testing set. 
+```{r,cache=TRUE}
+partition<-createDataPartition(data$classe,p=0.7, list=FALSE)
+training<-data[partition, ]
+testing<-data[-partition,]
+dim(training)
+dim(testing)
+```
+
+### Selecting Model:
+In this section we will estimate different methods to select the most accurate method.
+
+#### a. Decision Tree
+```{r,cache=TRUE}
+treemod<-rpart(classe~., data=training, method="class")
+treepred<-predict(treemod,testing,type="class")
+confusionMatrix(treepred,testing$classe)
+rpart.plot(treemod,main="Classification Tree", extra=102,under = TRUE, faclen=0)
+```
+
+#### b. Random Forest
+```{r,cache=TRUE}
+rfmod<-randomForest(classe~., data=training, method="class")
+rfpre<-predict(rfmod,testing,type="class")
+confusionMatrix(rfpre,testing$classe)
+```
+
+#### Summary
+
+The Random Forest model provides the best results. It has an accuracy of 99.7% and an out of sample error of 0.3%. We will select the Random Forest model for the screening test.
+
+### Prediction Quiz
+We clean the data, same process as before:
+
+```{r,cache=TRUE}
+data<-read.csv("pml-testing.csv",na.strings = c("NA","#DIV/0!",""))
+toclean<-sapply(colnames(data), function(x) if(sum(is.na(data[,x]))>0.5*nrow(data)){return(TRUE)}else{return(FALSE)})
+data<-data[,!toclean]
+data<-data[,-(1:6)]
+pre<-predict(rfmod,data,type="class")
+```
+Using Random Forest model we obtain an 100% of accuracy in the prediction test.
